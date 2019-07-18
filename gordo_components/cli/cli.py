@@ -277,15 +277,16 @@ def get_all_score_strings(metadata):
     ...  {
     ...     "model": {
     ...         "cross-validation": {
-    ...             "scores": {"explained variance": {"min": 0, "max": 2}}
+    ...             "scores": {"explained variance": {"min": 0, "max": 2},
+    ...                        "cv loss": {"min":1,"max":3}}
     ...         }
     ...     }
     ...   }
     ... )
     >>> len(score_strings)
-    2
+    4
     >>> score_strings
-    ['explained-variance_min=0', 'explained-variance_max=2']
+    ['explained-variance_min=0', 'explained-variance_max=2', 'cv-loss_min=1', 'cv-loss_max=3']
 
 
     """

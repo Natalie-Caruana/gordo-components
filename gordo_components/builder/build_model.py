@@ -9,14 +9,16 @@ from pathlib import Path
 from typing import Union, Optional, Dict, Any
 
 from sklearn.base import BaseEstimator
-from sklearn.model_selection import cross_val_score, TimeSeriesSplit
+from sklearn.model_selection import cross_validate, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
+import numpy as np
 
 from gordo_components.util import disk_registry
 from gordo_components import serializer, __version__, MAJOR_VERSION, MINOR_VERSION
 from gordo_components.dataset.dataset import _get_dataset
 from gordo_components.dataset.base import GordoBaseDataset
 from gordo_components.model.base import GordoBase
+from gordo_components.model.models import KerasBaseEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -75,16 +77,37 @@ def build_model(
 
     scores: Dict[str, Any]
     if hasattr(model, "score"):
-        cv_scores = cross_val_score(model, X, y, cv=TimeSeriesSplit(n_splits=3))
+        n_splits = 3
+        cv = cross_validate(
+            model, X, y, return_estimator=True, cv=TimeSeriesSplit(n_splits=n_splits)
+        )
+
         scores = {
             "explained-variance": {
-                "mean": cv_scores.mean(),
-                "std": cv_scores.std(),
-                "max": cv_scores.max(),
-                "min": cv_scores.min(),
-                "raw-scores": cv_scores.tolist(),
+                "mean": cv["test_score"].mean(),
+                "std": cv["test_score"].std(),
+                "max": cv["test_score"].max(),
+                "min": cv["test_score"].min(),
+                "raw-scores": cv["test_score"].tolist(),
             }
         }
+
+        # adding loss function to scores if Gordo model is a KerasBaseEstimator
+        gordo_model = _get_final_gordo_base_step(model)
+        if issubclass(gordo_model.__class__, KerasBaseEstimator):
+            val_losses = np.array([])
+            for mod in cv["estimator"]:
+                gordo_model_cv = _get_final_gordo_base_step(mod)
+                val_loss = gordo_model_cv.get_metadata()["history"]["loss"][0]
+                val_losses = np.append(val_losses, val_loss)
+            scores["cv-loss"] = {
+                "mean": val_losses.mean(),
+                "std": val_losses.std(),
+                "max": val_losses.max(),
+                "min": val_losses.min(),
+                "raw-scores": val_losses.tolist(),
+            }
+
     else:
         logger.debug("Unable to score model, has no attribute 'score'.")
         scores = dict()
