@@ -11,9 +11,11 @@ from tempfile import TemporaryDirectory
 from gordo_components.builder.build_model import (
     _save_model_for_workflow,
     provide_saved_model,
+    _get_final_gordo_base_step,
 )
 from gordo_components.builder import build_model
 from gordo_components.dataset.sensor_tag import SensorTag
+from gordo_components.model.models import KerasBaseEstimator
 
 
 def get_random_data():
@@ -155,6 +157,58 @@ class ModelBuilderTestCase(unittest.TestCase):
 
         self.metadata_check(metadata, False)
 
+    def test_scores_metadata_for_keras_models(self):
+        data_config = get_random_data()
+
+        raw_model_config1 = """
+         gordo_components.model.models.KerasAutoEncoder:
+            kind: feedforward_hourglass
+         """
+        raw_model_config2 = """ 
+        sklearn.pipeline.Pipeline:
+            steps: 
+            - sklearn.preprocessing.data.MinMaxScaler
+            - gordo_components.model.models.KerasLSTMAutoEncoder:
+                kind: lstm_model
+        """
+        raw_model_config3 = """
+        sklearn.pipeline.Pipeline:
+            steps:
+              - sklearn.pipeline.Pipeline:
+                  steps:
+                    - sklearn.preprocessing.data.MinMaxScaler
+              - sklearn.pipeline.Pipeline:
+                  steps:
+                    - gordo_components.model.models.KerasAutoEncoder:
+                        kind: feedforward_symmetric
+        """
+        model_config1 = yaml.load(raw_model_config1, Loader=yaml.FullLoader)
+        model_config2 = yaml.load(raw_model_config2, Loader=yaml.FullLoader)
+        model_config3 = yaml.load(raw_model_config3, Loader=yaml.FullLoader)
+
+        model1, metadata1 = build_model(
+            name="model-name",
+            model_config=model_config1,
+            data_config=data_config,
+            metadata={},
+        )
+        model2, metadata2 = build_model(
+            name="model-name",
+            model_config=model_config2,
+            data_config=data_config,
+            metadata={},
+        )
+        model3, metadata3 = build_model(
+            name="model-name",
+            model_config=model_config3,
+            data_config=data_config,
+            metadata={},
+        )
+
+        self.metadata_check_keras_models(model1, metadata1)
+        self.metadata_check_keras_models(model2, metadata2)
+        self.metadata_check_keras_models(model3, metadata3)
+
     def metadata_check(self, metadata, check_history):
         self.assertTrue("name" in metadata)
         self.assertTrue("model" in metadata)
@@ -167,11 +221,19 @@ class ModelBuilderTestCase(unittest.TestCase):
             self.assertTrue(
                 "explained-variance" in metadata["model"]["cross-validation"]["scores"]
             )
+
         if check_history:
             self.assertTrue("history" in metadata["model"])
             self.assertTrue("params" in metadata["model"]["history"])
             self.assertTrue("loss" in metadata["model"]["history"])
             self.assertTrue("acc" in metadata["model"]["history"])
+
+    def metadata_check_keras_models(self, model, metadata):
+        gordo_model = _get_final_gordo_base_step(model)
+        if issubclass(gordo_model.__class__, KerasBaseEstimator):
+            self.assertTrue(
+                "cv-loss" in metadata["model"]["cross-validation"]["scores"]
+            )
 
     def test_provide_saved_model_simple_happy_path(self):
         """
