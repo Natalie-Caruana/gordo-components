@@ -17,6 +17,8 @@ from gordo_components.data_provider.base import GordoBaseDataProvider, capture_a
 
 from gordo_components.data_provider.iroc_reader import IrocReader
 from gordo_components.data_provider.ncs_reader import NcsReader
+from gordo_components.data_provider.spd_reader import SpdReader
+
 from gordo_components.dataset.sensor_tag import SensorTag
 
 
@@ -77,6 +79,7 @@ class DataLakeProvider(GordoBaseDataProvider):
     _SUB_READER_CLASSES = [
         NcsReader,
         IrocReader,
+        SpdReader,
     ]  # type: typing.List[typing.Type[GordoBaseDataProvider]]
 
     def can_handle_tag(self, tag):

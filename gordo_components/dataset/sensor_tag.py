@@ -22,6 +22,7 @@ TAG_TO_ASSET = [
     TagPatternToAsset(re.compile(r"^gfa.", re.IGNORECASE), "1110-gfa"),
     TagPatternToAsset(re.compile(r"^ninenine.+::.+", re.IGNORECASE), "ninenine"),
     TagPatternToAsset(re.compile(r"^uon_ef.+::.+", re.IGNORECASE), "uon_ef"),
+    TagPatternToAsset(re.compile(r"^spd.", re.IGNORECASE), "spd1999"),
 ]
 
 
