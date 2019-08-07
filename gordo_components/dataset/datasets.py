@@ -81,9 +81,12 @@ class TimeSeriesDataset(GordoBaseDataset):
             to_ts=self.to_ts,
             tag_list=list(set(self.tag_list + self.target_tag_list)),
         )
-        data: pd.DataFrame = self.join_timeseries(
-            series_iter, self.from_ts, self.to_ts, self.resolution
-        )
+        if self.resolution is None:
+            data = pd.concat(list(series_iter), axis=1, join="inner")
+        else:
+            data: pd.DataFrame = self.join_timeseries(
+                series_iter, self.from_ts, self.to_ts, self.resolution
+            )
         if self.row_filter:
             data = pandas_filter_rows(data, self.row_filter)
 
