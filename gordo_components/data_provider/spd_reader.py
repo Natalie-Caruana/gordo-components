@@ -108,7 +108,6 @@ class SpdReader(GordoBaseDataProvider):
                     index_col="time",
                 )
                 if filter_on_y:
-                    print(f"In filter_on_y, filtering away {len(df[df['y'] == 0])} elements")
                     df = df[df["y"] == 0]
                 if "spd-y" not in [tag.name for tag in tags]:
                     df = df.drop(columns=["y"], axis=1)
