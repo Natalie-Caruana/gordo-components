@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Iterable, List, Optional
 
@@ -22,7 +21,9 @@ class SpdReader(GordoBaseDataProvider):
     }
 
     def __init__(
-        self, client: core.AzureDLFileSystem, threads: Optional[int] = None, **kwargs
+        self, client: core.AzureDLFileSystem, threads: Optional[int] = None,
+            filter_on_y: Optional[bool] = True,
+       **kwargs
     ):
         """
         Creates a reader for tags from the synthetic paper dataset
@@ -31,6 +32,7 @@ class SpdReader(GordoBaseDataProvider):
         super().__init__(**kwargs)
         self.client = client
         self.threads = threads
+        self.filter_on_y=filter_on_y
 
     def can_handle_tag(self, tag: SensorTag):
         return SpdReader.base_path_from_asset(tag.asset) is not None
@@ -55,6 +57,7 @@ class SpdReader(GordoBaseDataProvider):
                     adls_file_system_client=adls_file_system_client,
                     tags=tag_list,
                     dry_run=dry_run,
+                    filter_on_y=self.filter_on_y
                 )
 
         for col in df.columns:
@@ -65,6 +68,7 @@ class SpdReader(GordoBaseDataProvider):
         adls_file_system_client: core.AzureDLFileSystem,
         tags: List[SensorTag],
         dry_run: Optional[bool] = False,
+        filter_on_y: Optional[bool] = True,
     ) -> pd.DataFrame:
         """
 
@@ -74,7 +78,9 @@ class SpdReader(GordoBaseDataProvider):
             the AzureDLFileSystem client to use
         tag: SensorTag
             the tag to download data for
-
+        filter_on_y: Bool
+            Add option to filter on the y column (this will filter out y==1 to train on
+            normal data and then drops the column to train only on X)
         Returns
         -------
         pd.Series:
@@ -91,15 +97,19 @@ class SpdReader(GordoBaseDataProvider):
             return pd.DataFrame()
 
         with adls_file_system_client.open(file_path, "rb") as f:
-            df = pd.read_csv(
-                f,
-                usecols=[tag.name[len("spd-"):] for tag in tags] + ["time"],
-                dtype={tag.name[len("spd-"):]: np.float32 for tag in tags},
-                parse_dates=["time"],
-                date_parser=lambda col: pd.to_datetime(col, utc=True),
-                index_col="time",
-            )
-            df.columns = ["spd-"+col for col in df.columns]
+                df = pd.read_csv(
+                    f,
+                    usecols=list({tag.name[len("spd-"):] for tag in tags}.union({"time", "y"})),
+                    dtype={tag.name[len("spd-"):]: np.float32 for tag in tags},
+                    parse_dates=["time"],
+                    date_parser=lambda col: pd.to_datetime(col, utc=True),
+                    index_col="time",
+                )
+                if filter_on_y:
+                    df = df[df["y"] == 0]
+                if "spd-y" not in [tag.name for tag in tags]:
+                    df = df.drop(columns=["y"], axis=1)
+                df.columns = ["spd-"+col for col in df.columns]
         return df
 
     @staticmethod
