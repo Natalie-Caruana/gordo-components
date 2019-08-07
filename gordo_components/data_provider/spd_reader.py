@@ -97,15 +97,18 @@ class SpdReader(GordoBaseDataProvider):
             return pd.DataFrame()
 
         with adls_file_system_client.open(file_path, "rb") as f:
+                dtypes = {tag.name[len("spd-"):]: np.float32 for tag in tags}
+                dtypes["y"] = np.int
                 df = pd.read_csv(
                     f,
                     usecols=list({tag.name[len("spd-"):] for tag in tags}.union({"time", "y"})),
-                    dtype={tag.name[len("spd-"):]: np.float32 for tag in tags},
+                    dtype=dtypes,
                     parse_dates=["time"],
                     date_parser=lambda col: pd.to_datetime(col, utc=True),
                     index_col="time",
                 )
                 if filter_on_y:
+                    print(f"In filter_on_y, filtering away {len(df[df['y'] == 0])} elements")
                     df = df[df["y"] == 0]
                 if "spd-y" not in [tag.name for tag in tags]:
                     df = df.drop(columns=["y"], axis=1)
